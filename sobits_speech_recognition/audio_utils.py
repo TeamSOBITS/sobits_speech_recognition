@@ -130,7 +130,6 @@ class AudioSystem:
     def start_recording(self, chunk_size=3200):
         if self.is_running: return
         self.is_running = True
-        time.sleep(0.2)
 
         def _capture_loop():
             cmd = [
