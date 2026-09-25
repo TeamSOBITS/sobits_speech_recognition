@@ -118,6 +118,13 @@ class VadSegmenter:
         
         return result_segment
 
+    def flush(self):
+        # Finalize the segment still being spoken (e.g. when recording is canceled)
+        if not self.is_speaking:
+            return None
+        self.is_speaking = False
+        return self._finalize_segment()
+
     def _finalize_segment(self):
         duration_samples = len(self.current_speech_buffer) * self.hop_size
         if duration_samples < self.min_wipe_samples:

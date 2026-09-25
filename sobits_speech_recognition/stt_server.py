@@ -13,7 +13,7 @@ import wave
 import importlib
 import traceback
 import threading
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, wait
 from . import audio_utils
 try:
     from .vad import VadProcessor, VadSegmenter
@@ -152,6 +152,15 @@ class STTActionServer(Node):
                 if os.path.exists(wav_path):
                     os.remove(wav_path)
 
+        pending_recognitions = []
+
+        def submit_segment(speech_segment):
+            nonlocal file_counter
+            file_counter += 1
+            path = os.path.join(self.sound_file_directory, f'feedback_{file_counter}.wav')
+            if self._save_wav(speech_segment, path):
+                pending_recognitions.append(self.executor_pool.submit(process_recognition, path))
+
         try:
             while rclpy.ok():
                 now = time.time()
@@ -161,6 +170,12 @@ class STTActionServer(Node):
                 elif (now - start_time) > 10.0: break
 
                 if goal_handle.is_cancel_requested:
+                    # Transcribe the speech still being recorded so it is not lost,
+                    # and publish all feedback before the goal ends
+                    speech_segment = segmenter.flush() if segmenter else None
+                    if speech_segment:
+                        submit_segment(speech_segment)
+                    wait(pending_recognitions)
                     goal_handle.canceled()
                     return SpeechRecognition.Result()
 
@@ -185,10 +200,7 @@ class STTActionServer(Node):
                 elif segmenter:
                     speech_segment = segmenter.push_chunk(chunk_np, feedback_rate)
                     if speech_segment:
-                        file_counter += 1
-                        path = os.path.join(self.sound_file_directory, f'feedback_{file_counter}.wav')
-                        if self._save_wav(speech_segment, path):
-                            self.executor_pool.submit(process_recognition, path)
+                        submit_segment(speech_segment)
 
         finally:
             self.audio_sys.stop()
