@@ -107,7 +107,8 @@ class AudioSystem:
             else:
                 self.active_source = default_source
 
-            self.source_to_modify = self.active_source
+            # 音割れはマイク本体で起きるので、雑音除去(mic_aec)を挟んでも音量は本物のマイクにかける
+            self.source_to_modify = default_source
             
             if self.target_mic_volume:
                 subprocess.run(['pactl', 'set-source-volume', self.source_to_modify, self.target_mic_volume], check=True)

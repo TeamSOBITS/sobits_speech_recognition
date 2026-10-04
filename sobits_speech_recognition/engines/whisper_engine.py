@@ -17,6 +17,10 @@ class WhisperEngine(BaseEngine):
         self.node.declare_parameter('task', 'transcribe')
         self.node.declare_parameter('use_prompt', False)
         self.node.declare_parameter('replace_prompt_whisper', [""])
+        # faster-whisper のみ: 声の無い区間を Silero VAD で落とす(無音・雑音で「ご視聴ありがとうございました」などを作らない)
+        self.node.declare_parameter('vad_filter', False)
+        # faster-whisper のみ: 前の区間の文を次の区間のヒントにしない(同じ語のくり返しを防ぐ)
+        self.node.declare_parameter('condition_on_previous_text', True)
 
         self.backend = self.node.get_parameter('backend').value
         self.model_name = self.node.get_parameter('model_name').value
@@ -85,7 +89,9 @@ class WhisperEngine(BaseEngine):
                     audio_path,
                     language=language,
                     task=task,
-                    initial_prompt=prompt_text if prompt_text else None
+                    initial_prompt=prompt_text if prompt_text else None,
+                    vad_filter=self.node.get_parameter('vad_filter').value,
+                    condition_on_previous_text=self.node.get_parameter('condition_on_previous_text').value,
                 )
                 return " ".join([s.text for s in segments]).strip()
 
